@@ -7,6 +7,8 @@
   Private Shared ReadOnly hangulFinalsCount As Integer = 28
   Private Shared ReadOnly hangulFinalsStrokesCount As Integer() = New Integer() {0, 2, 4, 4, 2, 5, 5, 3, 5, 7, 9, 9, 7, 9, 9, 8, 4, 4, 6, 2, 4, 1, 3, 4, 3, 4, 4, 3}
 
+  Private _In As TextReader = Console.In
+  Private _Out As TextWriter = Console.Out
   Private _Stacks As New AheuiStackCollection
   Private _Queues As New AheuiQueueCollection
   Private _Streams As New AheuiStreamCollection
@@ -19,13 +21,44 @@
   Private _IsFinished As Boolean
   Private _Ticks As Long
   Private _ExitCode As Integer
+  Private _LastWrittenValue As Integer
+  Private _ValueWritten As Boolean
 
   Private Property Commands As New Dictionary(Of InitialNames, AheuiCommand)
 
-  Public Property [In] As TextReader = Console.In
-  Public Property Out As TextWriter = Console.Out
   Public Property SelectedStorageToken As FinalNames
-  Public Property LastWrittenValue As Integer
+  Public Property IsClosingOldInWhenReplace As Boolean = True
+  Public Property IsClosingOldOutWhenReplace As Boolean = True
+
+  Public Property [In] As TextReader
+    Get
+      Return _In
+    End Get
+    Set(value As TextReader)
+      If IsClosingOldInWhenReplace AndAlso Not _In.Equals(Console.In) Then
+        Try
+          _In.Close()
+        Catch
+        End Try
+      End If
+      _In = value
+    End Set
+  End Property
+
+  Public Property Out As TextWriter
+    Get
+      Return _Out
+    End Get
+    Set(value As TextWriter)
+      If IsClosingOldOutWhenReplace AndAlso Not _Out.Equals(Console.Out) Then
+        Try
+          _Out.Close()
+        Catch
+        End Try
+      End If
+      _Out = value
+    End Set
+  End Property
 
   Public ReadOnly Property Stacks As AheuiStackCollection
     Get
@@ -102,6 +135,24 @@
   Public ReadOnly Property ExitCode As Integer
     Get
       Return _ExitCode
+    End Get
+  End Property
+
+  <EditorBrowsable(EditorBrowsableState.Advanced)>
+  Public Property LastWrittenValue As Integer
+    Get
+      Return _LastWrittenValue
+    End Get
+    Set(value As Integer)
+      _LastWrittenValue = value
+      _ValueWritten = True
+    End Set
+  End Property
+
+  <EditorBrowsable(EditorBrowsableState.Advanced)>
+  Public ReadOnly Property ValueWritten As Boolean
+    Get
+      Return _ValueWritten
     End Get
   End Property
 

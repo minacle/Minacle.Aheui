@@ -278,40 +278,45 @@ Public NotInheritable Class AheuiPopCommand
   Public Overrides Sub Invoke(ByRef initial As InitialNames, ByRef medial As MedialNames, ByRef final As FinalNames)
     With Interpreter
       Dim v As Integer = Nothing
-      Dim e As Boolean = False
-      If .Stacks.Contains(.SelectedStorageToken) Then
-        Dim s = .Stacks(.SelectedStorageToken)
-        If s.Count < 1 Then
-          medial = AheuiInterpreter.GetReversedMedial(medial)
-          Exit Sub
-        End If
-        v = s.Pop
-        e = True
-      ElseIf .Queues.Contains(.SelectedStorageToken) Then
-        Dim q = .Queues(.SelectedStorageToken)
-        If q.Count < 1 Then
-          medial = AheuiInterpreter.GetReversedMedial(medial)
-          Exit Sub
-        End If
-        v = q.Dequeue
-        e = True
-      ElseIf .Streams.Contains(.SelectedStorageToken) Then
-        Dim s = .Streams(.SelectedStorageToken)
-        Using r As New BinaryReader(s, Encoding.UTF8, True)
-          v = r.ReadInt32
-        End Using
-        e = True
-      End If
-      If e Then
+      If Invoke(v) Then
         Select Case final
           Case FinalNames.Ieung
             .Out.Write(v)
           Case FinalNames.Hieuh
             .Out.Write(ChrW(v))
         End Select
+      Else
+        medial = AheuiInterpreter.GetReversedMedial(medial)
       End If
     End With
   End Sub
+
+  Private Overloads Function Invoke(ByRef v As Integer) As Boolean
+    With Interpreter
+      If .Stacks.Contains(.SelectedStorageToken) Then
+        Dim s = .Stacks(.SelectedStorageToken)
+        If s.Count > 0 Then
+          v = s.Pop
+          Return True
+        End If
+      ElseIf .Queues.Contains(.SelectedStorageToken) Then
+        Dim q = .Queues(.SelectedStorageToken)
+        If q.Count > 0 Then
+          v = q.Dequeue
+          Return True
+        End If
+      ElseIf .Streams.Contains(.SelectedStorageToken) Then
+        Dim s = .Streams(.SelectedStorageToken)
+        Using r As New BinaryReader(s, Encoding.UTF8, True)
+          If r.PeekChar >= 0 Then
+            v = r.ReadInt32
+            Return True
+          End If
+        End Using
+      End If
+    End With
+    Return False
+  End Function
 End Class
 
 <EditorBrowsable(EditorBrowsableState.Advanced)>
@@ -324,20 +329,6 @@ Public NotInheritable Class AheuiPushCommand
 
   Public Overrides Sub Invoke(ByRef initial As InitialNames, ByRef medial As MedialNames, ByRef final As FinalNames)
     With Interpreter
-      If .Stacks.Contains(.SelectedStorageToken) Then
-        Dim s = .Stacks(.SelectedStorageToken)
-        s.Push(AheuiInterpreter.GetValue(final))
-      ElseIf .Queues.Contains(.SelectedStorageToken) Then
-        Dim q = .Queues(.SelectedStorageToken)
-        q.Enqueue(AheuiInterpreter.GetValue(final))
-      ElseIf .Streams.Contains(.SelectedStorageToken) Then
-        Dim s = .Streams(.SelectedStorageToken)
-        Using w As New BinaryWriter(s, Encoding.UTF8, True)
-          Dim v = AheuiInterpreter.GetValue(final)
-          w.Write(v)
-          .LastWrittenValue = v
-        End Using
-      End If
       If final = FinalNames.Ieung OrElse final = FinalNames.Hieuh Then
         Do Until .In.Peek > 0
           Thread.Sleep(0)
@@ -347,14 +338,34 @@ Public NotInheritable Class AheuiPushCommand
             Dim v = .In.ReadLine
             Dim r As Integer
             If Integer.TryParse(v, r) Then
-              .Out.Write(r)
+              Invoke(r)
             Else
-              .Out.Write(0)
+              Invoke(0)
             End If
           Case FinalNames.Hieuh
             Dim v = .In.Read
-            .Out.Write(ChrW(v))
+            Invoke(v)
         End Select
+      Else
+        Invoke(AheuiInterpreter.GetValue(final))
+      End If
+    End With
+  End Sub
+
+  Private Overloads Sub Invoke(v As Integer)
+    With Interpreter
+      If .Stacks.Contains(.SelectedStorageToken) Then
+        Dim s = .Stacks(.SelectedStorageToken)
+        s.Push(v)
+      ElseIf .Queues.Contains(.SelectedStorageToken) Then
+        Dim q = .Queues(.SelectedStorageToken)
+        q.Enqueue(v)
+      ElseIf .Streams.Contains(.SelectedStorageToken) Then
+        Dim s = .Streams(.SelectedStorageToken)
+        Using w As New BinaryWriter(s, Encoding.UTF8, True)
+          w.Write(v)
+          .LastWrittenValue = v
+        End Using
       End If
     End With
   End Sub
@@ -370,28 +381,38 @@ Public NotInheritable Class AheuiDuplicateCommand
 
   Public Overrides Sub Invoke(ByRef initial As InitialNames, ByRef medial As MedialNames, ByRef final As FinalNames)
     With Interpreter
-      If .Stacks.Contains(.SelectedStorageToken) Then
-        Dim s = .Stacks(.SelectedStorageToken)
-        If s.Count < 1 Then
-          medial = AheuiInterpreter.GetReversedMedial(medial)
-          Exit Sub
-        End If
-        s.Push(s.Peek)
-      ElseIf .Queues.Contains(.SelectedStorageToken) Then
-        Dim q = .Queues(.SelectedStorageToken)
-        If q.Count < 1 Then
-          medial = AheuiInterpreter.GetReversedMedial(medial)
-          Exit Sub
-        End If
-        q.Enqueue(q.Peek)
-      ElseIf .Streams.Contains(.SelectedStorageToken) Then
-        Dim s = .Streams(.SelectedStorageToken)
-        Using w As New BinaryWriter(s, Encoding.UTF8, True)
-          w.Write(.LastWrittenValue)
-        End Using
+      If Not Invoke() Then
+        medial = AheuiInterpreter.GetReversedMedial(medial)
       End If
     End With
   End Sub
+
+  Private Overloads Function Invoke() As Boolean
+    With Interpreter
+      If .Stacks.Contains(.SelectedStorageToken) Then
+        Dim s = .Stacks(.SelectedStorageToken)
+        If s.Count > 0 Then
+          s.Push(s.Peek)
+          Return True
+        End If
+      ElseIf .Queues.Contains(.SelectedStorageToken) Then
+        Dim q = .Queues(.SelectedStorageToken)
+        If q.Count > 0 Then
+          q.Enqueue(q.Peek)
+          Return True
+        End If
+      ElseIf .Streams.Contains(.SelectedStorageToken) Then
+        Dim s = .Streams(.SelectedStorageToken)
+        Using w As New BinaryWriter(s, Encoding.UTF8, True)
+          If .ValueWritten Then
+            w.Write(.LastWrittenValue)
+            Return True
+          End If
+        End Using
+      End If
+    End With
+    Return False
+  End Function
 End Class
 
 <EditorBrowsable(EditorBrowsableState.Advanced)>
